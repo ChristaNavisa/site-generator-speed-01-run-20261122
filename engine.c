@@ -251,12 +251,15 @@ static inline __attribute__((always_inline)) size_t scan_jesc(const unsigned cha
   __m128i vq = _mm_set1_epi8('"');
   __m128i vb = _mm_set1_epi8('\\');
   __m128i zero = _mm_setzero_si128();
-  __m128i lim = _mm_set1_epi8(0x20);
+  /* Match v < 0x20 (strictly): saturating (v - 0x1F) is 0 iff v <= 0x1F.
+   * Using 0x20 here would also match the space byte 0x20 and escape it
+   * as \u0020, bloating the output and breaking byte-equality. */
+  __m128i lim = _mm_set1_epi8(0x1F);
   while (i + 16 <= n) {
     __m128i v = _mm_loadu_si128((const __m128i *)(p + i));
     __m128i m = _mm_cmpeq_epi8(v, vq);
     m = _mm_or_si128(m, _mm_cmpeq_epi8(v, vb));
-    /* unsigned v < 0x20 iff saturating (v - 0x20) is 0. */
+    /* unsigned v < 0x20 iff saturating (v - 0x1F) is 0. */
     __m128i sub = _mm_subs_epu8(v, lim);
     m = _mm_or_si128(m, _mm_cmpeq_epi8(sub, zero));
     int mask = _mm_movemask_epi8(m);
